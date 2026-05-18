@@ -1,0 +1,15 @@
+# HitechFibre Cron Schedule
+# Add to docker-compose as a 'cron' service, or run via system cron on the host.
+# Syntax: minute hour day month weekday command
+
+# Sync Splynx customer cache every 10 minutes
+*/10 * * * * cd /var/www/html && php artisan splynx:sync >> /var/www/html/logs/cron.log 2>&1
+
+# Clean stale sessions every hour
+0 * * * * cd /var/www/html && php artisan sessions:clean >> /var/www/html/logs/cron.log 2>&1
+
+# Rotate old logs daily at midnight
+0 0 * * * find /var/www/html/logs -name "*.log.*" -mtime +7 -delete
+
+# Send SLA breach alerts every 15 minutes (when implemented)
+# */15 * * * * cd /var/www/html && php artisan sla:check >> /var/www/html/logs/cron.log 2>&1

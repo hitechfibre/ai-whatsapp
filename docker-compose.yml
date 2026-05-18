@@ -1,0 +1,181 @@
+# ─────────────────────────────────────────────────────────────────────
+# HitechFibre AI WhatsApp Support — Docker Compose Stack
+# 
+# Portainer deployment:
+#   Stacks → Add Stack → Repository → set GitHub URL
+#   Set ALL environment variables in the Portainer "Environment variables" panel
+#   (see .env.example for the full list — never commit real secrets to git)
+# ─────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ─── Web / PHP ────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    image: hitechfibre/app:latest
+    container_name: hitechfibre_web
+    restart: unless-stopped
+    environment:
+      CONTAINER_ROLE: web
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_WEBHOOK_SECRET: ${APP_WEBHOOK_SECRET}
+      DB_DRIVER: ${DB_DRIVER:-mysql}
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-hitechfibre}
+      DB_USER: ${DB_USER:-hitechfibre}
+      DB_PASS: ${DB_PASS}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      SPLYNX_URL: ${SPLYNX_URL}
+      SPLYNX_API_KEY: ${SPLYNX_API_KEY}
+      SPLYNX_API_SECRET: ${SPLYNX_API_SECRET}
+      RESPONDIO_API_KEY: ${RESPONDIO_API_KEY}
+      RESPONDIO_INBOX_ID: ${RESPONDIO_INBOX_ID}
+      RESPONDIO_TEAM_TECH: ${RESPONDIO_TEAM_TECH:-1}
+      RESPONDIO_TEAM_ACCOUNTS: ${RESPONDIO_TEAM_ACCOUNTS:-2}
+      RESPONDIO_TEAM_SALES: ${RESPONDIO_TEAM_SALES:-3}
+      OPENAI_ENABLED: ${OPENAI_ENABLED:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN}
+      ADMIN_SECRET_PATH: ${ADMIN_SECRET_PATH:-hitechfibre_admin}
+      BH_TIMEZONE: ${BH_TIMEZONE:-Africa/Johannesburg}
+      TZ: Africa/Johannesburg
+    volumes:
+      - app_logs:/var/www/html/logs
+      - app_state:/var/www/html/state
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - hitechfibre_net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost/webhook.php"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ─── Queue Worker ─────────────────────────────────────────────────
+  worker:
+    image: hitechfibre/app:latest
+    container_name: hitechfibre_worker
+    restart: unless-stopped
+    environment:
+      CONTAINER_ROLE: worker
+      APP_ENV: ${APP_ENV:-production}
+      DB_DRIVER: ${DB_DRIVER:-mysql}
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-hitechfibre}
+      DB_USER: ${DB_USER:-hitechfibre}
+      DB_PASS: ${DB_PASS}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      SPLYNX_URL: ${SPLYNX_URL}
+      SPLYNX_API_KEY: ${SPLYNX_API_KEY}
+      SPLYNX_API_SECRET: ${SPLYNX_API_SECRET}
+      RESPONDIO_API_KEY: ${RESPONDIO_API_KEY}
+      RESPONDIO_INBOX_ID: ${RESPONDIO_INBOX_ID}
+      TZ: Africa/Johannesburg
+    volumes:
+      - app_logs:/var/www/html/logs
+      - app_state:/var/www/html/state
+    depends_on:
+      - db
+      - redis
+    networks:
+      - hitechfibre_net
+
+  # ─── Cron scheduler ───────────────────────────────────────────────
+  cron:
+    image: hitechfibre/app:latest
+    container_name: hitechfibre_cron
+    restart: unless-stopped
+    environment:
+      CONTAINER_ROLE: cron
+      APP_ENV: ${APP_ENV:-production}
+      DB_DRIVER: ${DB_DRIVER:-mysql}
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-hitechfibre}
+      DB_USER: ${DB_USER:-hitechfibre}
+      DB_PASS: ${DB_PASS}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      SPLYNX_URL: ${SPLYNX_URL}
+      SPLYNX_API_KEY: ${SPLYNX_API_KEY}
+      SPLYNX_API_SECRET: ${SPLYNX_API_SECRET}
+      TZ: Africa/Johannesburg
+    volumes:
+      - app_logs:/var/www/html/logs
+      - app_state:/var/www/html/state
+    depends_on:
+      - db
+      - redis
+    networks:
+      - hitechfibre_net
+
+  # ─── MySQL 8 ──────────────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: hitechfibre_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-hitechfibre}
+      MYSQL_USER: ${DB_USER:-hitechfibre}
+      MYSQL_PASSWORD: ${DB_PASS}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - hitechfibre_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ─── Redis 7 ──────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: hitechfibre_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
+    volumes:
+      - redis_data:/data
+    networks:
+      - hitechfibre_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  db_data:
+  redis_data:
+  app_logs:
+  app_state:
+
+networks:
+  hitechfibre_net:
+    driver: bridge

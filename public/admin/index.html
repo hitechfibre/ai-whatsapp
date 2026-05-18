@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HitechFibre — Support Command Centre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #090b10;
+  --surface:   #0e1118;
+  --card:      #131720;
+  --border:    #1e2535;
+  --border2:   #252d40;
+  --accent:    #00d4ff;
+  --accent2:   #0099cc;
+  --green:     #00e676;
+  --yellow:    #ffc107;
+  --red:       #ff4444;
+  --orange:    #ff7043;
+  --text:      #e8ecf4;
+  --muted:     #5a6478;
+  --mono:      'JetBrains Mono', monospace;
+  --sans:      'Syne', sans-serif;
+  --r:         6px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Grid scan-line overlay ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,212,255,0.012) 2px,
+    rgba(0,212,255,0.012) 4px
+  );
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* ── Layout ── */
+.shell { display: flex; height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.logo {
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.logo-mark {
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+.logo-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.nav { flex: 1; padding: 12px 0; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: all 0.15s;
+  border-left: 3px solid transparent;
+  position: relative;
+}
+.nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.nav-item.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: rgba(0,212,255,0.06);
+}
+.nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+.nav-badge {
+  margin-left: auto;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-family: var(--mono);
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+.nav-badge.yellow { background: var(--yellow); color: #000; }
+.nav-badge.green  { background: var(--green);  color: #000; }
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.status-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  margin-right: 6px;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* ── Main ── */
+.main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  height: 58px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.topbar-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
+
+.btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: var(--r);
+  cursor: pointer;
+  border: 1px solid var(--border2);
+  background: var(--card);
+  color: var(--muted);
+  transition: all 0.15s;
+  letter-spacing: 0.5px;
+}
+.btn:hover { color: var(--text); border-color: var(--accent); }
+.btn.primary {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.btn.primary:hover { background: #00b8db; }
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px;
+}
+
+/* ── Stat cards ── */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0.3;
+}
+.stat-card.green::after  { background: var(--green); }
+.stat-card.yellow::after { background: var(--yellow); }
+.stat-card.red::after    { background: var(--red); }
+.stat-card.orange::after { background: var(--orange); }
+
+.stat-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.stat-value {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text);
+  letter-spacing: -1px;
+}
+.stat-delta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.stat-delta.up   { color: var(--green); }
+.stat-delta.down { color: var(--red); }
+
+/* ── Two-column layout ── */
+.cols { display: grid; grid-template-columns: 1fr 380px; gap: 18px; }
+.cols.full { grid-template-columns: 1fr; }
+
+/* ── Panel ── */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.panel-body { padding: 0; }
+
+/* ── Conversation list ── */
+.conv-list { max-height: 520px; overflow-y: auto; }
+.conv-list::-webkit-scrollbar { width: 4px; }
+.conv-list::-webkit-scrollbar-track { background: transparent; }
+.conv-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.conv-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.conv-item:hover { background: rgba(255,255,255,0.025); }
+.conv-item:last-child { border-bottom: none; }
+.conv-item.selected { background: rgba(0,212,255,0.06); }
+
+.conv-avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-family: var(--sans);
+}
+
+.conv-info { flex: 1; min-width: 0; }
+.conv-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conv-preview {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.conv-meta { text-align: right; flex-shrink: 0; }
+.conv-time {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+.badge.active    { background: rgba(0,230,118,0.15); color: var(--green); }
+.badge.escalated { background: rgba(255,68,68,0.15);  color: var(--red); }
+.badge.waiting   { background: rgba(255,193,7,0.15);  color: var(--yellow); }
+.badge.closed    { background: rgba(90,100,120,0.15); color: var(--muted); }
+.badge.tech      { background: rgba(0,212,255,0.12);  color: var(--accent); }
+.badge.accounts  { background: rgba(255,112,67,0.12); color: var(--orange); }
+.badge.sales     { background: rgba(0,230,118,0.12);  color: var(--green); }
+
+/* ── Chat view ── */
+.chat-view { height: 520px; display: flex; flex-direction: column; }
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chat-messages::-webkit-scrollbar { width: 4px; }
+.chat-messages::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.msg {
+  max-width: 80%;
+  padding: 9px 13px;
+  border-radius: var(--r);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.msg.inbound  {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  align-self: flex-start;
+}
+.msg.outbound {
+  background: rgba(0,212,255,0.12);
+  border: 1px solid rgba(0,212,255,0.25);
+  align-self: flex-end;
+}
+.msg-meta {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.chat-footer {
+  border-top: 1px solid var(--border);
+  padding: 12px 14px;
+  display: flex;
+  gap: 8px;
+}
+.chat-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 8px 12px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  outline: none;
+}
+.chat-input:focus { border-color: var(--accent); }
+
+/* ── Activity log ── */
+.log-list { font-family: var(--mono); font-size: 11px; max-height: 260px; overflow-y: auto; }
+.log-list::-webkit-scrollbar { width: 4px; }
+.log-list::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.log-entry {
+  display: flex;
+  gap: 10px;
+  padding: 7px 18px;
+  border-bottom: 1px solid rgba(30,37,53,0.6);
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity:0; transform: translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+
+.log-time { color: var(--muted); flex-shrink: 0; }
+.log-level { flex-shrink: 0; width: 48px; }
+.log-level.info    { color: var(--accent); }
+.log-level.warning { color: var(--yellow); }
+.log-level.error   { color: var(--red); }
+.log-msg { color: var(--text); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* ── Splynx debug ── */
+.debug-panel { padding: 18px; }
+.debug-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.debug-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 8px 12px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  outline: none;
+}
+.debug-input:focus { border-color: var(--accent); }
+
+.debug-result {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  white-space: pre-wrap;
+  max-height: 320px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+.debug-result::-webkit-scrollbar { width: 4px; }
+.debug-result::-webkit-scrollbar-thumb { background: var(--border2); }
+
+.json-key    { color: var(--accent); }
+.json-str    { color: var(--green); }
+.json-num    { color: var(--orange); }
+.json-bool   { color: var(--yellow); }
+.json-null   { color: var(--muted); }
+
+/* ── Analytics ── */
+.chart-wrap {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.bar-chart { display: flex; flex-direction: column; gap: 8px; }
+.bar-row { display: flex; align-items: center; gap: 12px; }
+.bar-label { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 80px; flex-shrink: 0; }
+.bar-outer { flex: 1; height: 20px; background: var(--surface); border-radius: 3px; overflow: hidden; }
+.bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(.4,0,.2,1);
+}
+.bar-count { font-family: var(--mono); font-size: 11px; color: var(--text); width: 32px; text-align: right; }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 18px;
+  background: var(--surface);
+}
+.tab {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 12px 16px;
+  cursor: pointer;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s;
+}
+.tab:hover   { color: var(--text); }
+.tab.active  { color: var(--accent); border-bottom-color: var(--accent); }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ── Empty state ── */
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.empty-icon { font-size: 28px; margin-bottom: 10px; }
+
+/* ── Scrollbar global ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ── Loading spinner ── */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Outage alert ── */
+.outage-banner {
+  background: rgba(255,68,68,0.1);
+  border: 1px solid rgba(255,68,68,0.3);
+  border-radius: var(--r);
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  animation: fadeIn 0.3s ease;
+}
+.outage-banner.hidden { display: none; }
+
+/* ── Pages ── */
+.page { display: none; }
+.page.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">HitechFibre</div>
+      <div class="logo-sub">Support Command</div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard', this)">
+        <span class="nav-icon">⚡</span> Dashboard
+      </div>
+      <div class="nav-item" data-page="conversations" onclick="showPage('conversations', this)">
+        <span class="nav-icon">💬</span> Conversations
+        <span class="nav-badge" id="badge-escalated">0</span>
+      </div>
+      <div class="nav-item" data-page="splynx" onclick="showPage('splynx', this)">
+        <span class="nav-icon">🔍</span> Splynx Debug
+      </div>
+      <div class="nav-item" data-page="analytics" onclick="showPage('analytics', this)">
+        <span class="nav-icon">📊</span> Analytics
+      </div>
+      <div class="nav-item" data-page="logs" onclick="showPage('logs', this)">
+        <span class="nav-icon">📋</span> Live Logs
+        <span class="nav-badge yellow" id="badge-errors">0</span>
+      </div>
+      <div class="nav-item" data-page="settings" onclick="showPage('settings', this)">
+        <span class="nav-icon">⚙️</span> Settings
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div><span class="status-dot"></span>System online</div>
+      <div id="last-refresh" style="margin-top:4px;">Last refresh: —</div>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="page-title">Dashboard</div>
+      <div class="topbar-actions">
+        <span id="clock" style="font-family:var(--mono);font-size:12px;color:var(--muted);"></span>
+        <button class="btn" onclick="refreshAll()">↺ Refresh</button>
+        <button class="btn primary" onclick="openTicketModal()">+ New Ticket</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ── Dashboard ── -->
+      <div id="page-dashboard" class="page active">
+
+        <div id="outage-banner" class="outage-banner hidden">
+          🚨 <strong>Possible Outage Detected</strong> — Multiple customers reporting connectivity issues in the last 30 minutes.
+        </div>
+
+        <div class="stat-row">
+          <div class="stat-card green">
+            <div class="stat-label">Active Chats</div>
+            <div class="stat-value" id="stat-active">—</div>
+            <div class="stat-delta" id="delta-active">↑ loading...</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-label">Escalated</div>
+            <div class="stat-value" id="stat-escalated">—</div>
+            <div class="stat-delta">Waiting for agent</div>
+          </div>
+          <div class="stat-card yellow">
+            <div class="stat-label">After Hours</div>
+            <div class="stat-value" id="stat-afterhours">—</div>
+            <div class="stat-delta">Queued tickets</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Closed Today</div>
+            <div class="stat-value" id="stat-closed">—</div>
+            <div class="stat-delta" id="delta-closed">loading...</div>
+          </div>
+          <div class="stat-card orange">
+            <div class="stat-label">Tickets Created</div>
+            <div class="stat-value" id="stat-tickets">—</div>
+            <div class="stat-delta">Splynx tickets</div>
+          </div>
+        </div>
+
+        <div class="cols">
+          <!-- Conversations -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Live Conversations</div>
+              <div style="display:flex;gap:8px;">
+                <select id="filter-status" onchange="loadConversations()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:4px 8px;border-radius:var(--r);font-family:var(--mono);font-size:11px;">
+                  <option value="">All</option>
+                  <option value="active">Active</option>
+                  <option value="escalated">Escalated</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="conv-list" id="conv-list">
+                <div class="empty"><div class="empty-icon">💬</div>Loading conversations...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat view -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title" id="chat-title">Select a conversation</div>
+              <div style="display:flex;gap:6px;" id="chat-actions" style="display:none;">
+                <button class="btn" onclick="takeOver()" id="btn-takeover">Take Over</button>
+                <button class="btn" onclick="closeConv()" id="btn-close">Close</button>
+              </div>
+            </div>
+            <div class="chat-view">
+              <div class="chat-messages" id="chat-messages">
+                <div class="empty"><div class="empty-icon">👆</div>Click a conversation to view</div>
+              </div>
+              <div class="chat-footer">
+                <input type="text" class="chat-input" id="chat-send-input" placeholder="Send message as agent..." onkeydown="handleChatKey(event)">
+                <button class="btn primary" onclick="sendAgentMessage()">Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Conversations page ── -->
+      <div id="page-conversations" class="page">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">All Conversations</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="search-input" placeholder="Search by name or phone..." onkeyup="searchConversations()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px;outline:none;width:220px;">
+              <select id="filter-dept" onchange="loadConversations()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:5px 8px;border-radius:var(--r);font-family:var(--mono);font-size:11px;">
+                <option value="">All Departments</option>
+                <option value="tech_support">Technical</option>
+                <option value="accounts">Accounts</option>
+                <option value="sales">Sales</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="conv-list" id="conv-list-full" style="max-height:calc(100vh - 220px);">
+              <div class="empty"><div class="empty-icon">💬</div>Loading...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Splynx Debug ── -->
+      <div id="page-splynx" class="page">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Splynx Customer Lookup</div>
+            <button class="btn" onclick="syncSplynx()">↺ Sync Cache</button>
+          </div>
+          <div class="debug-panel">
+            <div class="debug-row">
+              <input type="text" class="debug-input" id="splynx-phone" placeholder="Phone number (e.g. 0821234567 or +27821234567)">
+              <button class="btn primary" onclick="lookupSplynx()">Lookup</button>
+            </div>
+            <div id="splynx-result" class="debug-result" style="display:none;"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;" class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Splynx API Health</div>
+          </div>
+          <div class="debug-panel">
+            <div id="splynx-health" class="debug-result">Click "Check" to test Splynx API connection.</div>
+            <div style="margin-top:10px;">
+              <button class="btn" onclick="checkSplynxHealth()">Check API Health</button>
+              <button class="btn" style="margin-left:8px;" onclick="testTicket()">Test Ticket Creation</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Analytics ── -->
+      <div id="page-analytics" class="page">
+        <div class="cols">
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">Conversations by Department</div></div>
+            <div class="chart-wrap">
+              <div class="bar-chart" id="dept-chart">
+                <div class="empty"><div class="empty-icon">📊</div>Loading analytics...</div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">Resolution Stats</div></div>
+            <div class="chart-wrap" id="resolution-stats">
+              <div class="empty">Loading...</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:18px;" class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Activity — Last 7 Days</div>
+          </div>
+          <div class="chart-wrap">
+            <div id="daily-chart" class="bar-chart"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Logs ── -->
+      <div id="page-logs" class="page">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Live System Logs</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select id="log-level-filter" onchange="loadLogs()" style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:4px 8px;border-radius:var(--r);font-family:var(--mono);font-size:11px;">
+                <option value="">All levels</option>
+                <option value="error">Errors only</option>
+                <option value="warning">Warnings+</option>
+                <option value="info">Info+</option>
+              </select>
+              <button class="btn" onclick="loadLogs()">↺ Refresh</button>
+              <label style="font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="checkbox" id="auto-refresh-logs" checked onchange="toggleAutoRefresh(this)"> Auto-refresh
+              </label>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="log-list" id="log-list" style="max-height:calc(100vh - 200px);">
+              <div class="empty">Loading logs...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Settings ── -->
+      <div id="page-settings" class="page">
+        <div class="cols">
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">System Configuration</div></div>
+            <div style="padding:20px;" id="settings-view">
+              <div class="empty">Loading settings...</div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">Business Hours</div></div>
+            <div style="padding:20px;">
+              <div id="biz-hours-status" style="font-family:var(--mono);font-size:12px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<script>
+// ──────────────────────────────────────────────
+// State
+// ──────────────────────────────────────────────
+let selectedConvId = null;
+let logAutoRefresh = true;
+let logTimer = null;
+let refreshTimer = null;
+const API = '/admin/api.php';  // backend endpoint
+
+// ──────────────────────────────────────────────
+// Init
+// ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  startClock();
+  refreshAll();
+  startAutoRefresh();
+});
+
+function startAutoRefresh() {
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(refreshAll, 15000);
+}
+
+function startClock() {
+  const el = document.getElementById('clock');
+  setInterval(() => {
+    const now = new Date();
+    el.textContent = now.toLocaleTimeString('en-ZA', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      timeZone: 'Africa/Johannesburg'
+    }) + ' SAST';
+  }, 1000);
+}
+
+function refreshAll() {
+  loadStats();
+  loadConversations();
+  if (selectedConvId) loadMessages(selectedConvId);
+  document.getElementById('last-refresh').textContent =
+    'Last refresh: ' + new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ──────────────────────────────────────────────
+// Page routing
+// ──────────────────────────────────────────────
+function showPage(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('page-title').textContent = el.textContent.trim();
+
+  // Lazy load page content
+  if (page === 'analytics')    loadAnalytics();
+  if (page === 'logs')         loadLogs();
+  if (page === 'conversations') loadConversations(true);
+  if (page === 'settings')     loadSettings();
+}
+
+// ──────────────────────────────────────────────
+// API helpers
+// ──────────────────────────────────────────────
+async function api(action, params = {}) {
+  const url = new URL(API, location.origin);
+  url.searchParams.set('action', action);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('API error ' + r.status);
+  return r.json();
+}
+
+async function apiPost(action, data = {}) {
+  const r = await fetch(API + '?action=' + action, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return r.json();
+}
+
+// ──────────────────────────────────────────────
+// Stats
+// ──────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const d = await api('stats');
+    set('stat-active',     d.active     ?? '—');
+    set('stat-escalated',  d.escalated  ?? '—');
+    set('stat-afterhours', d.after_hours ?? '—');
+    set('stat-closed',     d.closed_today ?? '—');
+    set('stat-tickets',    d.tickets_today ?? '—');
+    set('badge-escalated', d.escalated ?? 0);
+    set('badge-errors',    d.errors_today ?? 0);
+
+    // Show outage banner if many tech reports
+    const banner = document.getElementById('outage-banner');
+    banner.classList.toggle('hidden', !(d.possible_outage ?? false));
+  } catch(e) {
+    // silently degrade — backend may not be running in preview
+  }
+}
+
+// ──────────────────────────────────────────────
+// Conversations
+// ──────────────────────────────────────────────
+async function loadConversations(fullPage = false) {
+  const statusFilter = document.getElementById('filter-status')?.value || '';
+  const deptFilter   = document.getElementById('filter-dept')?.value   || '';
+
+  try {
+    const d = await api('conversations', { status: statusFilter, dept: deptFilter, limit: 40 });
+    renderConvList(d.conversations || [], 'conv-list');
+    if (fullPage) renderConvList(d.conversations || [], 'conv-list-full');
+  } catch(e) {
+    renderDemoConversations();
+  }
+}
+
+function renderDemoConversations() {
+  const demo = [
+    { id: '1', name: 'Sipho Dlamini',    phone: '27834567890', status: 'escalated', dept: 'tech_support', preview: 'My internet is down since this morning',    time: '2m ago' },
+    { id: '2', name: 'Fatima Moosa',     phone: '27721234567', status: 'active',    dept: 'accounts',    preview: 'I received an overdue notice but I paid',   time: '5m ago' },
+    { id: '3', name: 'Unknown Customer', phone: '27659876543', status: 'active',    dept: 'tech_support', preview: 'Router lights are all off',                  time: '8m ago' },
+    { id: '4', name: 'Jacques van Wyk',  phone: '27831234567', status: 'active',    dept: 'sales',       preview: 'Interested in your 100Mbps package',         time: '15m ago' },
+    { id: '5', name: 'Thembi Nkosi',     phone: '27741234567', status: 'closed',    dept: 'tech_support', preview: 'Issue resolved — router rebooted',           time: '1h ago' },
+  ];
+  renderConvList(demo, 'conv-list');
+  renderConvList(demo, 'conv-list-full');
+}
+
+function renderConvList(conversations, listId) {
+  const el = document.getElementById(listId);
+  if (!el) return;
+
+  if (!conversations.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">✅</div>No conversations found</div>';
+    return;
+  }
+
+  el.innerHTML = conversations.map(c => `
+    <div class="conv-item ${c.id === selectedConvId ? 'selected' : ''}" onclick="selectConv('${c.id}', '${escHtml(c.name || 'Unknown')}')">
+      <div class="conv-avatar" style="background:${avatarColor(c.name || '?')}">${avatarInitial(c.name)}</div>
+      <div class="conv-info">
+        <div class="conv-name">${escHtml(c.name || c.phone || 'Unknown')}</div>
+        <div class="conv-preview">${escHtml(c.preview || '')}</div>
+      </div>
+      <div class="conv-meta">
+        <div class="conv-time">${c.time || ''}</div>
+        <div class="badge ${c.status}">${c.status}</div>
+        ${c.dept ? `<div class="badge ${c.dept.replace('_support','').replace('_','')} " style="margin-top:2px;">${c.dept.replace('_support','').replace('_',' ')}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function selectConv(id, name) {
+  selectedConvId = id;
+  document.getElementById('chat-title').textContent = name;
+  document.getElementById('chat-actions').style.display = 'flex';
+  await loadMessages(id);
+
+  // Re-render list to update selection highlight
+  document.querySelectorAll('.conv-item').forEach(el => {
+    el.classList.toggle('selected', el.onclick?.toString().includes(`'${id}'`));
+  });
+}
+
+async function loadMessages(convId) {
+  try {
+    const d = await api('messages', { conv_id: convId });
+    renderMessages(d.messages || []);
+  } catch(e) {
+    renderDemoMessages();
+  }
+}
+
+function renderDemoMessages() {
+  const msgs = [
+    { role: 'user',      content: 'Hi, my internet is not working', time: '14:32' },
+    { role: 'assistant', content: 'Hi! I\'m sorry to hear that. Let me help you. Can you confirm your address?', time: '14:32' },
+    { role: 'user',      content: '12 Oak Street, Centurion', time: '14:33' },
+    { role: 'assistant', content: 'Thanks! Have you tried restarting your router? Please switch it off, wait 30 seconds, and switch it back on.', time: '14:33' },
+    { role: 'user',      content: 'Yes I did, still not working', time: '14:35' },
+    { role: 'assistant', content: 'I\'m going to escalate this to our technical team who will contact you shortly. Your reference number is TKT-2024-001.', time: '14:35' },
+  ];
+  renderMessages(msgs);
+}
+
+function renderMessages(messages) {
+  const el = document.getElementById('chat-messages');
+  if (!messages.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">💬</div>No messages yet</div>';
+    return;
+  }
+  el.innerHTML = messages.map(m => `
+    <div class="msg ${m.role === 'user' ? 'inbound' : 'outbound'}">
+      ${escHtml(m.content)}
+      <div class="msg-meta">${m.time || ''}</div>
+    </div>
+  `).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function sendAgentMessage() {
+  const input = document.getElementById('chat-send-input');
+  const msg = input.value.trim();
+  if (!msg || !selectedConvId) return;
+  input.value = '';
+  try {
+    await apiPost('send_message', { conv_id: selectedConvId, message: msg });
+    await loadMessages(selectedConvId);
+  } catch(e) {
+    alert('Failed to send message');
+  }
+}
+
+function handleChatKey(e) {
+  if (e.key === 'Enter') sendAgentMessage();
+}
+
+async function takeOver() {
+  if (!selectedConvId) return;
+  if (!confirm('Take over this conversation? The AI bot will pause.')) return;
+  await apiPost('takeover', { conv_id: selectedConvId });
+  refreshAll();
+}
+
+async function closeConv() {
+  if (!selectedConvId) return;
+  if (!confirm('Close this conversation? A Splynx ticket will be created if not already done.')) return;
+  await apiPost('close_conversation', { conv_id: selectedConvId });
+  selectedConvId = null;
+  document.getElementById('chat-title').textContent = 'Select a conversation';
+  document.getElementById('chat-messages').innerHTML = '<div class="empty"><div class="empty-icon">✅</div>Conversation closed</div>';
+  refreshAll();
+}
+
+function searchConversations() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  document.querySelectorAll('#conv-list-full .conv-item').forEach(el => {
+    el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// ──────────────────────────────────────────────
+// Splynx debug
+// ──────────────────────────────────────────────
+async function lookupSplynx() {
+  const phone = document.getElementById('splynx-phone').value.trim();
+  if (!phone) return;
+  const resultEl = document.getElementById('splynx-result');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = '<span class="spinner"></span> Looking up...';
+  try {
+    const d = await api('splynx_lookup', { phone });
+    resultEl.innerHTML = syntaxHighlight(JSON.stringify(d, null, 2));
+  } catch(e) {
+    resultEl.innerHTML = '<span style="color:var(--red)">Error: ' + e.message + '</span>';
+  }
+}
+
+async function checkSplynxHealth() {
+  const el = document.getElementById('splynx-health');
+  el.innerHTML = '<span class="spinner"></span> Checking...';
+  try {
+    const d = await api('splynx_health');
+    el.innerHTML = syntaxHighlight(JSON.stringify(d, null, 2));
+  } catch(e) {
+    el.innerHTML = '<span style="color:var(--red)">Error: ' + e.message + '</span>';
+  }
+}
+
+async function syncSplynx() {
+  const el = document.getElementById('splynx-health');
+  el.innerHTML = '<span class="spinner"></span> Syncing customer cache...';
+  try {
+    const d = await api('splynx_sync');
+    el.innerHTML = syntaxHighlight(JSON.stringify(d, null, 2));
+  } catch(e) {
+    el.innerHTML = '<span style="color:var(--red)">Error: ' + e.message + '</span>';
+  }
+}
+
+async function testTicket() {
+  if (!confirm('Create a test ticket in Splynx?')) return;
+  try {
+    const d = await apiPost('test_ticket', {});
+    alert('Result: ' + JSON.stringify(d));
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+// ──────────────────────────────────────────────
+// Analytics
+// ──────────────────────────────────────────────
+async function loadAnalytics() {
+  try {
+    const d = await api('analytics');
+    renderDeptChart(d.by_department || {});
+    renderResolutionStats(d.resolution || {});
+    renderDailyChart(d.daily || []);
+  } catch(e) {
+    renderDemoAnalytics();
+  }
+}
+
+function renderDemoAnalytics() {
+  renderDeptChart({ tech_support: 42, accounts: 28, sales: 15, unknown: 7 });
+  renderResolutionStats({ resolved_by_bot: 61, escalated: 31, abandoned: 8, avg_duration_min: 12 });
+  renderDailyChart([
+    { day: 'Mon', count: 34 }, { day: 'Tue', count: 41 }, { day: 'Wed', count: 28 },
+    { day: 'Thu', count: 55 }, { day: 'Fri', count: 63 }, { day: 'Sat', count: 22 }, { day: 'Sun', count: 8 },
+  ]);
+}
+
+function renderDeptChart(data) {
+  const el = document.getElementById('dept-chart');
+  const max = Math.max(...Object.values(data), 1);
+  const colors = { tech_support: 'var(--accent)', accounts: 'var(--orange)', sales: 'var(--green)', unknown: 'var(--muted)' };
+  el.innerHTML = Object.entries(data).map(([dept, count]) => `
+    <div class="bar-row">
+      <div class="bar-label">${dept.replace('_', ' ').replace('support', 'tech')}</div>
+      <div class="bar-outer">
+        <div class="bar-fill" style="width:${(count/max*100).toFixed(1)}%;background:${colors[dept]||'var(--accent)'}"></div>
+      </div>
+      <div class="bar-count">${count}</div>
+    </div>
+  `).join('');
+}
+
+function renderResolutionStats(data) {
+  const el = document.getElementById('resolution-stats');
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div style="text-align:center;padding:16px;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);">
+        <div style="font-size:28px;font-weight:800;color:var(--green)">${data.resolved_by_bot ?? 0}%</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:1px;">BOT RESOLVED</div>
+      </div>
+      <div style="text-align:center;padding:16px;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);">
+        <div style="font-size:28px;font-weight:800;color:var(--red)">${data.escalated ?? 0}%</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:1px;">ESCALATED</div>
+      </div>
+      <div style="text-align:center;padding:16px;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);">
+        <div style="font-size:28px;font-weight:800;color:var(--accent)">${data.avg_duration_min ?? 0}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:1px;">AVG MINUTES</div>
+      </div>
+      <div style="text-align:center;padding:16px;background:var(--surface);border-radius:var(--r);border:1px solid var(--border);">
+        <div style="font-size:28px;font-weight:800;color:var(--muted)">${data.abandoned ?? 0}%</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:1px;">ABANDONED</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderDailyChart(data) {
+  const el = document.getElementById('daily-chart');
+  const max = Math.max(...data.map(d => d.count), 1);
+  el.innerHTML = data.map(d => `
+    <div class="bar-row">
+      <div class="bar-label">${d.day}</div>
+      <div class="bar-outer">
+        <div class="bar-fill" style="width:${(d.count/max*100).toFixed(1)}%;background:var(--accent);opacity:0.7;"></div>
+      </div>
+      <div class="bar-count">${d.count}</div>
+    </div>
+  `).join('');
+}
+
+// ──────────────────────────────────────────────
+// Logs
+// ──────────────────────────────────────────────
+async function loadLogs() {
+  try {
+    const level = document.getElementById('log-level-filter')?.value || '';
+    const d = await api('logs', { level, limit: 100 });
+    renderLogs(d.entries || []);
+    set('badge-errors', d.error_count ?? 0);
+  } catch(e) {
+    renderDemoLogs();
+  }
+}
+
+function renderDemoLogs() {
+  renderLogs([
+    { time: '14:35:02', level: 'info',    message: 'Webhook received from 27834567890' },
+    { time: '14:35:03', level: 'info',    message: 'Customer identified: Sipho Dlamini (ID: 1042)' },
+    { time: '14:35:03', level: 'info',    message: 'Intent detected: tech_support (score: 8)' },
+    { time: '14:35:04', level: 'info',    message: 'Message sent via respond.io' },
+    { time: '14:32:11', level: 'warning', message: 'Rate limit hit for contact 27721234567' },
+    { time: '14:28:55', level: 'info',    message: 'Conversation closed — creating Splynx ticket' },
+    { time: '14:28:56', level: 'info',    message: 'Splynx ticket created: #TKT-2892' },
+    { time: '14:15:02', level: 'error',   message: 'Splynx API timeout after 3 retries — customer lookup failed' },
+    { time: '14:10:43', level: 'info',    message: 'After-hours message received — queued for morning' },
+  ]);
+}
+
+function renderLogs(entries) {
+  const el = document.getElementById('log-list');
+  if (!entries.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>No log entries</div>';
+    return;
+  }
+  el.innerHTML = entries.map(e => `
+    <div class="log-entry">
+      <span class="log-time">${e.time || ''}</span>
+      <span class="log-level ${e.level}">${(e.level||'info').padEnd(7)}</span>
+      <span class="log-msg">${escHtml(e.message || '')}</span>
+    </div>
+  `).join('');
+}
+
+function toggleAutoRefresh(checkbox) {
+  logAutoRefresh = checkbox.checked;
+  clearInterval(logTimer);
+  if (logAutoRefresh) {
+    logTimer = setInterval(loadLogs, 5000);
+  }
+}
+
+// ──────────────────────────────────────────────
+// Settings
+// ──────────────────────────────────────────────
+async function loadSettings() {
+  try {
+    const d = await api('settings');
+    renderSettings(d);
+  } catch(e) {
+    renderDemoSettings();
+  }
+  updateBizHoursStatus();
+}
+
+function renderDemoSettings() {
+  document.getElementById('settings-view').innerHTML = `
+    <div style="font-family:var(--mono);font-size:12px;line-height:2;color:var(--muted);">
+      <div style="color:var(--text);font-weight:600;margin-bottom:10px;">Current Configuration</div>
+      ${row('Environment', 'production')}
+      ${row('Database', 'MySQL')}
+      ${row('Redis', 'Connected')}
+      ${row('Splynx', 'Configured')}
+      ${row('OpenAI', 'Disabled')}
+      ${row('Anti-spam delay', '8 seconds')}
+      ${row('After-hours', 'Enabled')}
+      ${row('Bot version', '2.0.0')}
+    </div>
+  `;
+}
+
+function renderSettings(data) {
+  document.getElementById('settings-view').innerHTML = `
+    <div style="font-family:var(--mono);font-size:12px;line-height:2;color:var(--muted);">
+      ${Object.entries(data).map(([k, v]) => row(k, v)).join('')}
+    </div>
+  `;
+}
+
+function updateBizHoursStatus() {
+  const el = document.getElementById('biz-hours-status');
+  const now = new Date();
+  const hour = parseInt(now.toLocaleTimeString('en-ZA', { hour: '2-digit', hour12: false, timeZone: 'Africa/Johannesburg' }));
+  const day  = now.toLocaleDateString('en-ZA', { weekday: 'short', timeZone: 'Africa/Johannesburg' });
+
+  const isSat = day === 'Sat';
+  const isSun = day === 'Sun';
+  let open = false;
+  let schedule = '';
+
+  if (isSun) {
+    schedule = 'Closed on Sundays';
+  } else if (isSat) {
+    open = hour >= 8 && hour < 13;
+    schedule = 'Saturday: 08:00 – 13:00';
+  } else {
+    open = hour >= 8 && hour < 17;
+    schedule = 'Mon-Fri: 08:00 – 17:00';
+  }
+
+  el.innerHTML = `
+    <div style="font-size:22px;font-weight:800;color:${open?'var(--green)':'var(--red)'};margin-bottom:8px;">
+      ${open ? '🟢 OPEN' : '🔴 AFTER HOURS'}
+    </div>
+    <div style="color:var(--muted);">${schedule}</div>
+    <div style="color:var(--muted);margin-top:4px;">Current time: ${now.toLocaleTimeString('en-ZA', { timeZone:'Africa/Johannesburg' })} SAST</div>
+    <div style="margin-top:12px;font-size:11px;color:var(--muted);">
+      After-hours messages are acknowledged and queued.<br>
+      Splynx ticket auto-created for urgent technical issues.
+    </div>
+  `;
+}
+
+// ──────────────────────────────────────────────
+// Utility
+// ──────────────────────────────────────────────
+function set(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function avatarInitial(name) {
+  if (!name || name === 'Unknown') return '?';
+  return name.trim().charAt(0).toUpperCase();
+}
+
+function avatarColor(name) {
+  const colors = ['#1a3a4a','#2a3520','#3a2a20','#2a2040','#3a1a2a','#1a3a30'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function row(label, value) {
+  const val = typeof value === 'boolean'
+    ? `<span style="color:${value?'var(--green)':'var(--red)'}">${value ? 'Yes' : 'No'}</span>`
+    : `<span style="color:var(--text)">${escHtml(String(value))}</span>`;
+  return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
+    <span>${escHtml(label)}</span>${val}</div>`;
+}
+
+function syntaxHighlight(json) {
+  json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+    let cls = 'json-num';
+    if (/^"/.test(match)) cls = /:$/.test(match) ? 'json-key' : 'json-str';
+    else if (/true|false/.test(match)) cls = 'json-bool';
+    else if (/null/.test(match)) cls = 'json-null';
+    return `<span class="${cls}">${match}</span>`;
+  });
+}
+
+function openTicketModal() {
+  alert('Ticket creation modal — connect to admin API to enable.');
+}
+</script>
+</body>
+</html>

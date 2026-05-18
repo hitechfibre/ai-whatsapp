@@ -1,0 +1,388 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * HitechFibre CLI Artisan
+ * Usage: php artisan <command> [options]
+ */
+
+define('BASE_PATH', __DIR__);
+
+require_once BASE_PATH . '/vendor/autoload.php';
+
+use HitechFibre\Core\Config;
+use HitechFibre\Core\Database;
+use HitechFibre\Core\Cache;
+use HitechFibre\Core\Logger;
+
+// ──────────────────────────────────────────────
+// Bootstrap config
+// ──────────────────────────────────────────────
+Config::load(BASE_PATH . '/config/settings.json');
+
+$command = $argv[1] ?? 'help';
+$args    = array_slice($argv, 2);
+
+// ──────────────────────────────────────────────
+// Command router
+// ──────────────────────────────────────────────
+match ($command) {
+    'migrate'        => cmdMigrate($args),
+    'migrate:fresh'  => cmdMigrateFresh(),
+    'queue:work'     => cmdQueueWork(),
+    'cache:clear'    => cmdCacheClear(),
+    'cache:stats'    => cmdCacheStats(),
+    'log:tail'       => cmdLogTail($args),
+    'sessions:clean' => cmdSessionsClean(),
+    'splynx:sync'    => cmdSplynxSync(),
+    'test:webhook'   => cmdTestWebhook($args),
+    'stats'          => cmdStats(),
+    'help'           => cmdHelp(),
+    default          => (fn() => writeln("Unknown command: {$command}. Run 'php artisan help'.", 'red'))(),
+};
+
+// ──────────────────────────────────────────────
+// Commands
+// ──────────────────────────────────────────────
+
+function cmdMigrate(array $args): void
+{
+    $db = Database::getInstance();
+    $migrationsPath = BASE_PATH . '/migrations';
+
+    $files = glob("{$migrationsPath}/*.sql");
+    sort($files);
+
+    writeln('Running migrations...', 'cyan');
+
+    foreach ($files as $file) {
+        $name = basename($file);
+        writeln("  → {$name}", 'yellow');
+
+        $sql = file_get_contents($file);
+
+        // Split on semicolons, skip empty
+        $statements = array_filter(
+            array_map('trim', explode(';', $sql)),
+            fn($s) => !empty($s)
+        );
+
+        foreach ($statements as $statement) {
+            try {
+                $db->query($statement);
+            } catch (\Throwable $e) {
+                // SQLite: ignore "already exists" errors on re-run
+                if (str_contains($e->getMessage(), 'already exists')) {
+                    continue;
+                }
+                writeln("    ERROR: " . $e->getMessage(), 'red');
+            }
+        }
+    }
+
+    writeln('Migrations complete.', 'green');
+}
+
+function cmdMigrateFresh(): void
+{
+    $db = Database::getInstance();
+    $driver = Config::get('database.driver', 'sqlite');
+
+    if ($driver === 'sqlite') {
+        $path = Config::get('database.path', BASE_PATH . '/state/db.sqlite');
+        if (file_exists($path)) {
+            unlink($path);
+            writeln("Dropped SQLite database: {$path}", 'yellow');
+        }
+    } else {
+        writeln('Fresh migration on MySQL: drops and recreates all tables.', 'yellow');
+        $tables = ['messages', 'conversations', 'tickets', 'customers', 'webhook_events'];
+        foreach ($tables as $table) {
+            try {
+                $db->query("DROP TABLE IF EXISTS {$table}");
+                writeln("  Dropped: {$table}", 'yellow');
+            } catch (\Throwable $e) {
+                writeln("  Error dropping {$table}: " . $e->getMessage(), 'red');
+            }
+        }
+    }
+
+    cmdMigrate([]);
+}
+
+function cmdQueueWork(): void
+{
+    $cache  = new Cache();
+    $logger = new Logger('queue');
+
+    writeln('Queue worker started. Ctrl+C to stop.', 'green');
+    writeln('Listening on queue: hitechfibre:jobs', 'cyan');
+
+    declare(ticks=1);
+    pcntl_signal(SIGTERM, function () {
+        writeln('SIGTERM received, shutting down.', 'yellow');
+        exit(0);
+    });
+
+    $idle = 0;
+
+    while (true) {
+        $job = $cache->queuePop('hitechfibre:jobs');
+
+        if ($job) {
+            $idle = 0;
+            try {
+                $data = json_decode($job, true);
+                writeln("[" . date('H:i:s') . "] Processing job: " . ($data['type'] ?? 'unknown'), 'cyan');
+                processJob($data, $cache, $logger);
+                writeln("[" . date('H:i:s') . "] Job complete.", 'green');
+            } catch (\Throwable $e) {
+                writeln("[" . date('H:i:s') . "] Job failed: " . $e->getMessage(), 'red');
+                $logger->error('Queue job failed', ['error' => $e->getMessage(), 'job' => $job]);
+            }
+        } else {
+            $idle++;
+            if ($idle % 60 === 0) {
+                writeln("[" . date('H:i:s') . "] Idle...", 'dim');
+            }
+            sleep(1);
+        }
+    }
+}
+
+function processJob(array $data, Cache $cache, Logger $logger): void
+{
+    $type = $data['type'] ?? '';
+
+    switch ($type) {
+        case 'process_webhook':
+            require_once BASE_PATH . '/public/webhook.php';
+            break;
+
+        case 'send_message':
+            $respondIO = new \HitechFibre\Services\RespondIOService();
+            $respondIO->sendMessage($data['contact_id'], $data['message']);
+            break;
+
+        case 'create_ticket':
+            $splynx = new \HitechFibre\Services\SplynxService();
+            $splynx->createTicket(
+                $data['customer_id'],
+                $data['subject'],
+                $data['body'],
+                $data['priority'] ?? 'medium'
+            );
+            break;
+
+        case 'splynx_sync':
+            $splynx = new \HitechFibre\Services\SplynxService();
+            $splynx->syncCustomerCache();
+            break;
+
+        default:
+            $logger->warning('Unknown job type', ['type' => $type]);
+    }
+}
+
+function cmdCacheClear(): void
+{
+    $cache = new Cache();
+    $cleared = $cache->flush();
+    writeln($cleared ? 'Cache cleared.' : 'Cache clear failed (may be using file fallback — clearing files).', 'green');
+
+    // Also clear file cache
+    $cacheDir = BASE_PATH . '/state/cache';
+    if (is_dir($cacheDir)) {
+        $files = glob("{$cacheDir}/*.cache");
+        foreach ($files as $f) {
+            unlink($f);
+        }
+        writeln('File cache cleared: ' . count($files) . ' entries.', 'green');
+    }
+}
+
+function cmdCacheStats(): void
+{
+    $cache = new Cache();
+    $stats = $cache->stats();
+
+    writeln('Cache Statistics:', 'cyan');
+    foreach ($stats as $key => $value) {
+        writeln(sprintf("  %-20s %s", $key . ':', $value), 'white');
+    }
+}
+
+function cmdLogTail(array $args): void
+{
+    $lines  = (int)($args[0] ?? 50);
+    $logger = new Logger('webhook');
+    $entries = $logger->getRecentEntries($lines);
+
+    writeln("Last {$lines} log entries:", 'cyan');
+    foreach ($entries as $entry) {
+        $level   = strtoupper($entry['level'] ?? 'info');
+        $time    = $entry['timestamp'] ?? '';
+        $message = $entry['message'] ?? '';
+        $color   = match ($level) {
+            'ERROR'   => 'red',
+            'WARNING' => 'yellow',
+            'INFO'    => 'white',
+            default   => 'dim',
+        };
+        writeln("[{$time}] [{$level}] {$message}", $color);
+    }
+}
+
+function cmdSessionsClean(): void
+{
+    $db = Database::getInstance();
+
+    // Close conversations inactive for > 24 hours
+    $cutoff = date('Y-m-d H:i:s', strtotime('-24 hours'));
+    $result = $db->query(
+        "UPDATE conversations SET status='closed', updated_at=NOW() 
+         WHERE status NOT IN ('closed','escalated') AND updated_at < ?",
+        [$cutoff]
+    );
+
+    $count = $result->rowCount();
+    writeln("Cleaned {$count} stale conversations.", 'green');
+
+    // Remove old webhook event dedup records from DB if any
+    $db->query(
+        "DELETE FROM webhook_events WHERE created_at < ?",
+        [date('Y-m-d H:i:s', strtotime('-7 days'))]
+    );
+    writeln('Old webhook events pruned.', 'green');
+}
+
+function cmdSplynxSync(): void
+{
+    writeln('Syncing Splynx customer cache...', 'cyan');
+    $splynx = new \HitechFibre\Services\SplynxService();
+
+    try {
+        $customers = $splynx->syncCustomerCache();
+        writeln("Synced {$customers} customers to cache.", 'green');
+    } catch (\Throwable $e) {
+        writeln("Sync failed: " . $e->getMessage(), 'red');
+    }
+}
+
+function cmdTestWebhook(array $args): void
+{
+    $phone   = $args[0] ?? '27821234567';
+    $message = $args[1] ?? 'Hello, my internet is down';
+
+    writeln("Simulating webhook from +{$phone}: \"{$message}\"", 'cyan');
+
+    $payload = [
+        'type'    => 'message',
+        'traffic' => 'incoming',
+        'data'    => [
+            'id'        => 'test_' . uniqid(),
+            'type'      => 'text',
+            'text'      => $message,
+            'timestamp' => time(),
+            'from'      => [
+                'type'  => 'contact',
+                'phone' => $phone,
+                'id'    => 'test_contact_' . $phone,
+            ],
+        ],
+    ];
+
+    // Post to local webhook
+    $url = Config::get('app.webhook_url', 'http://localhost/webhook.php');
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT        => 10,
+    ]);
+
+    $result   = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    writeln("Response HTTP {$httpCode}:", 'cyan');
+    writeln($result ?: '(empty)', 'white');
+}
+
+function cmdStats(): void
+{
+    $db = Database::getInstance();
+
+    writeln('HitechFibre System Stats', 'cyan');
+    writeln(str_repeat('─', 40), 'dim');
+
+    try {
+        $total   = $db->query("SELECT COUNT(*) as c FROM conversations")->fetch()['c'];
+        $open    = $db->query("SELECT COUNT(*) as c FROM conversations WHERE status='active'")->fetch()['c'];
+        $esc     = $db->query("SELECT COUNT(*) as c FROM conversations WHERE status='escalated'")->fetch()['c'];
+        $closed  = $db->query("SELECT COUNT(*) as c FROM conversations WHERE status='closed'")->fetch()['c'];
+        $msgs    = $db->query("SELECT COUNT(*) as c FROM messages")->fetch()['c'];
+        $tickets = $db->query("SELECT COUNT(*) as c FROM tickets")->fetch()['c'];
+
+        writeln(sprintf("  %-25s %d", "Total conversations:", $total), 'white');
+        writeln(sprintf("  %-25s %d", "Active:", $open), 'green');
+        writeln(sprintf("  %-25s %d", "Escalated:", $esc), 'yellow');
+        writeln(sprintf("  %-25s %d", "Closed:", $closed), 'dim');
+        writeln(sprintf("  %-25s %d", "Total messages:", $msgs), 'white');
+        writeln(sprintf("  %-25s %d", "Splynx tickets created:", $tickets), 'white');
+    } catch (\Throwable $e) {
+        writeln('Could not fetch stats: ' . $e->getMessage(), 'red');
+        writeln("Run 'php artisan migrate' first.", 'yellow');
+    }
+}
+
+function cmdHelp(): void
+{
+    writeln('', '');
+    writeln('HitechFibre Artisan CLI', 'cyan');
+    writeln(str_repeat('─', 40), 'dim');
+    writeln('', '');
+
+    $commands = [
+        'migrate'        => 'Run database migrations',
+        'migrate:fresh'  => 'Drop all tables and re-run migrations',
+        'queue:work'     => 'Start the job queue worker',
+        'cache:clear'    => 'Flush all cached data',
+        'cache:stats'    => 'Show cache statistics',
+        'log:tail [N]'   => 'Tail last N log lines (default 50)',
+        'sessions:clean' => 'Close stale conversations (>24h)',
+        'splynx:sync'    => 'Sync Splynx customer list to cache',
+        'test:webhook [phone] [message]' => 'Simulate incoming WhatsApp message',
+        'stats'          => 'Show system statistics',
+        'help'           => 'Show this help screen',
+    ];
+
+    foreach ($commands as $cmd => $desc) {
+        writeln(sprintf("  php artisan %-35s %s", $cmd, $desc), 'white');
+    }
+
+    writeln('', '');
+}
+
+// ──────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────
+
+function writeln(string $message, string $color = 'white'): void
+{
+    $colors = [
+        'red'    => "\033[0;31m",
+        'green'  => "\033[0;32m",
+        'yellow' => "\033[0;33m",
+        'cyan'   => "\033[0;36m",
+        'white'  => "\033[0;37m",
+        'dim'    => "\033[2m",
+        ''       => '',
+    ];
+    $reset = "\033[0m";
+    $code  = $colors[$color] ?? '';
+    echo "{$code}{$message}{$reset}\n";
+}

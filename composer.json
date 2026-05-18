@@ -1,0 +1,30 @@
+{
+  "name": "hitechfibre/whatsapp-support",
+  "description": "HitechFibre AI WhatsApp Support System",
+  "type": "project",
+  "require": {
+    "php": ">=8.2"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11"
+  },
+  "autoload": {
+    "psr-4": {
+      "HitechFibre\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "HitechFibre\\Tests\\": "tests/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true
+  },
+  "scripts": {
+    "migrate": "php artisan migrate",
+    "test": "phpunit",
+    "check": "php -l src/**/*.php public/*.php"
+  }
+}
